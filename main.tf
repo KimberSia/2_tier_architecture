@@ -7,7 +7,7 @@ data "aws_region" "current" {}
 resource "aws_vpc" "vpc" {
   cidr_block = var.vpc_cidr
   tags = {
-    Name        = var.vpc_name
+    Name        = "wk22_vpc"
     Environment = "dev"
     Terraform   = "true"
   }
@@ -15,7 +15,7 @@ resource "aws_vpc" "vpc" {
 #Deploy the private subnets
 resource "aws_subnet" "private_subnets" {
   for_each   = var.private_subnets
-  vpc_id     = aws_vpc.vpc_name.id
+  vpc_id     = aws_vpc.vpc.id
   cidr_block = cidrsubnet(var.vpc_cidr, 8, each.value)
   availability_zone = tolist(data.aws_availability_zones.available.names)[
   each.value]
@@ -27,7 +27,7 @@ resource "aws_subnet" "private_subnets" {
 #Deploy the public subnets
 resource "aws_subnet" "public_subnets" {
   for_each   = var.public_subnets
-  vpc_id     = aws_vpc.vpc_name.id
+  vpc_id     = aws_vpc.vpc.id
   cidr_block = cidrsubnet(var.vpc_cidr, 8, each.value + 100)
   availability_zone = tolist(data.aws_availability_zones.available.
   names)[each.value]
@@ -77,7 +77,7 @@ resource "aws_route_table_association" "private" {
 }
 #Create Internet Gateway
 resource "aws_internet_gateway" "internet_gateway" {
-  vpc_id = aws_vpc.vpc_name.id
+  vpc_id = aws_vpc.vpc.id
   tags = {
     Name = "wk22_igw"
   }
@@ -102,7 +102,7 @@ resource "aws_nat_gateway" "nat_gateway" {
 #create a security group that allows to traffic to ssh/httpd/http
 resource "aws_security_group" "wk22-secgrp" {
   name_prefix = "wk22-secgrp"
-  vpc_id      = var.vpc_name
+  vpc_id      = aws_vpc.vpc.id
 
 
   ingress {
