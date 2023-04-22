@@ -2,14 +2,11 @@ variable "aws_region" {
   type    = string
   default = "us-east-1"
 }
-variable "vpc_name" {
-  type    = string
-  default = "vpc-08fad8edc24c0fc41"
-}
+
 
 variable "vpc_cidr" {
   type    = string
-  default = "10.0.0.0/16"
+  default = ["0.0.0.0/0"]
 }
 variable "private_subnets" {
   default = {
