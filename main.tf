@@ -3,6 +3,7 @@ data "aws_availability_zones" "available" {}
 data "aws_region" "current" {}
 
 
+
 #Define the VPC
 resource "aws_vpc" "vpc" {
   cidr_block           = var.vpc_cidr
@@ -113,32 +114,42 @@ resource "aws_security_group" "wk22_secgrp" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = var.vpc_cidr
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = var.vpc_cidr
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = var.vpc_cidr
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = var.vpc_cidr
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
-
-#create security group for rds 
+resource "aws_instance" "web__tier_server" {
+  ami                    = var.AMI
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.public_subnets["public_subnet_1"].id
+  key_name               = var.keyname
+  vpc_security_group_ids = [aws_security_group.wk22_secgrp.id]
+  user_data              = file("apache.sh")
+  tags = {
+    Name = "EC2"
+  }
+}
+#create a security group that allows to traffic to rds
 resource "aws_security_group" "wk22_secgrp_rds" {
   name_prefix = "wk_22_secgrp_rds"
   vpc_id      = aws_vpc.vpc.id
@@ -147,41 +158,39 @@ resource "aws_security_group" "wk22_secgrp_rds" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = var.vpc_cidr
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
 
-  # allow ec2 access to rds database
+  # ec2 to rds
   ingress {
-    description     = "mysql/rds"
-    from_port       = 3306
-    to_port         = 3306
-    protocol        = "tcp"
-    security_groups = [aws_security_group.wk22_secgrp.id]
+    description = "mysqs"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
   }
-
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = var.vpc_cidr
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
-    Name = "wk-22_security_group_RDS"
+    Name = "wk_22_security_group_RDS"
   }
 
 }
 
 #create an RDS Database Instance
 resource "aws_db_instance" "instance" {
-  allocated_storage      = 10
+
   engine                 = "mysql"
   engine_version         = "5.7"
   instance_class         = "db.t2.micro"
+  allocated_storage      = 10
   username               = "useridrds"
   password               = "rdspassword"
-  parameter_group_name   = "default.mysql5.7"
   vpc_security_group_ids = [aws_security_group.wk22_secgrp_rds.id, aws_security_group.wk22_secgrp.id]
   db_subnet_group_name   = aws_db_subnet_group.default.name
   skip_final_snapshot    = true
@@ -193,7 +202,6 @@ resource "aws_db_subnet_group" "default" {
   subnet_ids = [aws_subnet.private_subnets["private_subnet_1"].id, aws_subnet.private_subnets["private_subnet_2"].id]
 
   tags = {
-    Name = " DB Subnet Group"
+    Name = " DataBase Subnet Grp"
   }
 }
-
