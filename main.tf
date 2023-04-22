@@ -3,15 +3,20 @@ data "aws_availability_zones" "available" {}
 data "aws_region" "current" {}
 
 
+
 #Define the VPC
 resource "aws_vpc" "vpc" {
-  cidr_block = var.vpc_cidr
+  cidr_block           = var.vpc_cidr
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
   tags = {
     Name        = "wk22_vpc"
     Environment = "dev"
     Terraform   = "true"
   }
 }
+
 #Deploy the private subnets
 resource "aws_subnet" "private_subnets" {
   for_each   = var.private_subnets
@@ -100,8 +105,8 @@ resource "aws_nat_gateway" "nat_gateway" {
   }
 }
 #create a security group that allows to traffic to ssh/httpd/http
-resource "aws_security_group" "wk22-secgrp" {
-  name_prefix = "wk22-secgrp"
+resource "aws_security_group" "wk22_secgrp" {
+  name_prefix = "wk22_secgrp"
   vpc_id      = aws_vpc.vpc.id
 
 
@@ -132,8 +137,71 @@ resource "aws_security_group" "wk22-secgrp" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
+resource "aws_instance" "web__tier_server" {
+  ami                    = var.AMI
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.public_subnets["public_subnet_1"].id
+  key_name               = var.keyname
+  vpc_security_group_ids = [aws_security_group.wk22_secgrp.id]
+  user_data              = file("apache.sh")
+  tags = {
+    Name = "EC2"
+  }
+}
+#create a security group that allows to traffic to rds
+resource "aws_security_group" "wk22_secgrp_rds" {
+  name_prefix = "wk_22_secgrp_rds"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+
+  # ec2 to rds
+  ingress {
+    description = "mysqs"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   tags = {
-    Name = "week22_security_group"
+    Name = "wk_22_security_group_RDS"
+  }
+
+}
+
+#create an RDS Database Instance
+resource "aws_db_instance" "instance" {
+
+  engine                 = "mysql"
+  engine_version         = "5.7"
+  instance_class         = "db.t2.micro"
+  allocated_storage      = 10
+  username               = "useridrds"
+  password               = "rdspassword"
+  vpc_security_group_ids = [aws_security_group.wk22_secgrp_rds.id, aws_security_group.wk22_secgrp.id]
+  db_subnet_group_name   = aws_db_subnet_group.default.name
+  skip_final_snapshot    = true
+  publicly_accessible    = true
+}
+
+resource "aws_db_subnet_group" "default" {
+  name       = "rdsmysql"
+  subnet_ids = [aws_subnet.private_subnets["private_subnet_1"].id, aws_subnet.private_subnets["private_subnet_2"].id]
+
+  tags = {
+    Name = " DataBase Subnet Grp"
   }
 }
